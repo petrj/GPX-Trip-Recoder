@@ -93,7 +93,20 @@ namespace GPX_trip_recorder
             }
         }
 
-        private async Task<Location> GetLastLocation()
+        public List<string> GetSavedGPXRecords()
+        {
+            var files = System.IO.Directory.GetFiles(OutputDirectory, "*.gpx");
+
+            var res = new List<string>();
+            foreach (var f in files)
+            {
+                res.Add(System.IO.Path.GetFileName(f));
+            }
+
+            return res;
+        }
+
+        public async Task<Location> GetLastLocation()
         {
             try
             {
@@ -192,12 +205,12 @@ namespace GPX_trip_recorder
                 foreach (var loc in Locations)
                 {
                     textWriter.WriteStartElement("trkpt");
-                    textWriter.WriteAttributeString("lat", loc.Latitude.ToString("#0.00", CultureInfo.InvariantCulture));
-                    textWriter.WriteAttributeString("lon", loc.Longitude.ToString("#0.00", CultureInfo.InvariantCulture));
+                    textWriter.WriteAttributeString("lat", loc.Latitude.ToString("#0.000000000", CultureInfo.InvariantCulture));
+                    textWriter.WriteAttributeString("lon", loc.Longitude.ToString("#0.000000000", CultureInfo.InvariantCulture));
 
                     if (loc.Altitude.HasValue)
                     {
-                        textWriter.WriteElementString("ele", loc.Altitude.Value.ToString("#0.00", CultureInfo.InvariantCulture));
+                        textWriter.WriteElementString("ele", loc.Altitude.Value.ToString("#0.0", CultureInfo.InvariantCulture));
                     }
 
                     textWriter.WriteElementString("time", loc.Timestamp.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture));
