@@ -18,12 +18,16 @@ using System.Threading;
 using System.Collections.Generic;
 using Plugin.CurrentActivity;
 using PermissionStatus = Plugin.Permissions.Abstractions.PermissionStatus;
+using System.ComponentModel;
 
 namespace GPX_trip_recorder
 {
     [Activity(Label = "@string/app_name", Theme = "@style/AppTheme.NoActionBar", MainLauncher = true)]
     public class MainActivity : AppCompatActivity
     {
+        private DialogService _dialogService;
+        private BackgroundWorker _backgroundRecordchecker;
+
         private LocationServiceProvider LocationProvider
         {
             get
@@ -50,7 +54,28 @@ namespace GPX_trip_recorder
 
             LocationProvider.LocationChanged += LocationProvider_LocationChanged;
 
+            _dialogService = new DialogService(this);
+            _backgroundRecordchecker = new BackgroundWorker();
+            _backgroundRecordchecker.DoWork += _backgroundRecordchecker_DoWork;
+
             RefreshGUI();
+        }
+
+        private void _backgroundRecordchecker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            while (LocationProvider.Recording)
+            {
+                System.Threading.Thread.Sleep(1000); // wait
+            }
+
+            if (LocationProvider.RecordException != null)
+            {
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    _dialogService.Warning($"Record terminated: {LocationProvider.RecordException.Message}","Error");
+                    RefreshGUI();
+                });
+            }
         }
 
         private void LocationProvider_LocationChanged(object sender, EventArgs e)
@@ -137,9 +162,27 @@ namespace GPX_trip_recorder
 
         private async void StartClick(object sender, EventArgs eventArgs)
         {
+            var btrMng = new BatteryOptimizationManager();
+            if (!btrMng.AppIgnoringBatteryOptimizations())
+            {
+                var res = await _dialogService.ConfirmYesNoContinueDialog("Application runs in background and therefore Android must ignore battery optimization.", "", "Go to settings", "Close", "Continue");
+
+                if (res.HasValue && !res.Value)
+                {
+                    return; // close
+                }
+
+                if (res.HasValue && res.Value)
+                {
+                    btrMng.RequestIngoreBatteryOptimizations();
+                    return;
+                }
+            }
+
             if (await RequestLocationPermission())
             {
                 LocationProvider.StartRecord();
+                _backgroundRecordchecker.RunWorkerAsync();
                 RefreshGUI();
             }
         }
