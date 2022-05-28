@@ -103,6 +103,8 @@ namespace GPX_trip_recorder
                 res.Add(System.IO.Path.GetFileName(f));
             }
 
+            res.Sort();
+
             return res;
         }
 

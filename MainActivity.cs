@@ -46,7 +46,8 @@ namespace GPX_trip_recorder
             StrictMode.SetVmPolicy(builder.Build());
 
             Xamarin.Essentials.Platform.Init(this, savedInstanceState);
-            CrossCurrentActivity.Current.Activity = this;
+            //CrossCurrentActivity.Current.Activity = this;
+            Plugin.CurrentActivity.CrossCurrentActivity.Current.Init(this, savedInstanceState);
             SetContentView(Resource.Layout.activity_main);
 
             // Settings button
@@ -67,6 +68,8 @@ namespace GPX_trip_recorder
 
             var listView = FindViewById<ListView>(Resource.Id.listView);
             listView.OnItemLongClickListener = this;
+
+            StartService(new Intent(this, typeof(LocationForegroundService)));
 
             RefreshGUI();
         }
@@ -163,27 +166,47 @@ namespace GPX_trip_recorder
         {
             try
             {
-                var status = await CrossPermissions.Current.CheckPermissionStatusAsync<LocationAlwaysPermission>();
+                var status = await CrossPermissions.Current.CheckPermissionStatusAsync<LocationPermission>();
 
                 if (status != Plugin.Permissions.Abstractions.PermissionStatus.Granted)
                 {
-                    if (await CrossPermissions.Current.ShouldShowRequestPermissionRationaleAsync(Permission.LocationAlways))
+                    if (await CrossPermissions.Current.ShouldShowRequestPermissionRationaleAsync(Permission.Location))
                     {
-
+                        _dialogService.Information("Location services must be enabled for this application");
                     }
 
-                    status = await CrossPermissions.Current.RequestPermissionAsync<LocationAlwaysPermission>();
-                } else
+                    var prms = new List<Permission>();
+
+                    prms.Add(Permission.Location);
+                    prms.Add(Permission.LocationWhenInUse);
+
+                    Console.WriteLine(Android.OS.Build.VERSION.SdkInt);
+
+                    if (Android.OS.Build.VERSION.SdkInt <= BuildVersionCodes.R)
+                    {
+                        // https://developer.android.com/training/location/permissions
+                        prms.Add(Permission.LocationAlways);
+                    }
+                    
+                    var statuses = await CrossPermissions.Current.RequestPermissionsAsync(prms.ToArray());
+
+                    if (
+                        (statuses.ContainsKey(Permission.Location) && statuses[Permission.Location] == PermissionStatus.Granted) ||
+                        (statuses.ContainsKey(Permission.LocationWhenInUse) && statuses[Permission.LocationWhenInUse] == PermissionStatus.Granted) ||
+                        (statuses.ContainsKey(Permission.LocationAlways) && statuses[Permission.LocationAlways] == PermissionStatus.Granted)
+                        )
+                    {
+                        return true;
+                    }
+
+                    return false;
+
+                }
+                else
                 {
                     return true;
-                }
-
-                if (status == Plugin.Permissions.Abstractions.PermissionStatus.Granted)
-                {
-                    return true;
-                }
-
-                return false;
+                }                
+                
             }
             catch (Exception ex)
             {
